@@ -1,25 +1,23 @@
-#include "stdafx.h"
-#include "restServer.h"
+#include "linuxRestServer.h"
 
 
-
-restServer::restServer()
+linuxRestServer::linuxRestServer()
 {
 }
 
-restServer::restServer(utility::string_t url) :m_listener(url)
+linuxRestServer::linuxRestServer(utility::string_t url) :m_listener(url)
 {
-	m_listener.support(methods::GET, std::bind(&restServer::handle_get, this, std::placeholders::_1));
-	m_listener.support(methods::PUT, std::bind(&restServer::handle_put, this, std::placeholders::_1));
-	m_listener.support(methods::POST, std::bind(&restServer::handle_post, this, std::placeholders::_1));
-	m_listener.support(methods::DEL, std::bind(&restServer::handle_delete, this, std::placeholders::_1));
+	m_listener.support(methods::GET, std::bind(&linuxRestServer::handle_get, this, std::placeholders::_1));
+	m_listener.support(methods::PUT, std::bind(&linuxRestServer::handle_put, this, std::placeholders::_1));
+	m_listener.support(methods::POST, std::bind(&linuxRestServer::handle_post, this, std::placeholders::_1));
+	m_listener.support(methods::DEL, std::bind(&linuxRestServer::handle_delete, this, std::placeholders::_1));
 }
 
-restServer::~restServer()
+linuxRestServer::~linuxRestServer()
 {
 }
 
-void restServer::on_initialize(const string_t & address)
+void linuxRestServer::on_initialize(const string_t & address)
 {
 	uri_builder uri(address);
 
@@ -27,18 +25,20 @@ void restServer::on_initialize(const string_t & address)
 
 	this->open().wait();
 
+	isRunning = true;
+
 	ucout << utility::string_t(U("Listening for requests at: ")) << addr << std::endl;
 
 	return;
 }
 
-void restServer::on_shutdown()
+void linuxRestServer::on_shutdown()
 {
 	this->close().wait();
 	return;
 }
 
-void restServer::handle_error(pplx::task<void>& t)
+void linuxRestServer::handle_error(pplx::task<void>& t)
 {
 	try
 	{
@@ -50,6 +50,11 @@ void restServer::handle_error(pplx::task<void>& t)
 	}
 }
 
+bool linuxRestServer::getIsRunning()
+{
+	return isRunning;
+}
+
 std::vector<utility::string_t> requestPath(const http_request & message) {
 	auto relativePath = uri::decode(message.relative_uri().path());
 	return uri::split_path(relativePath);
@@ -58,7 +63,7 @@ std::vector<utility::string_t> requestPath(const http_request & message) {
 //
 // Get Request 
 //
-void restServer::handle_get(http_request message)
+void linuxRestServer::handle_get(http_request message)
 {
 	auto path = requestPath(message);
 
@@ -76,7 +81,10 @@ void restServer::handle_get(http_request message)
 			if (path[1] == U("status")) {
 				response[U("path")] = json::value::string(U("Status GET response"));
 			}
-
+			else if (path[1] == U("shutdown")) {
+				isRunning = false;
+				response[U("message")] = json::value::string(U("Shutdown response"));
+			}
 			ucout << response.serialize() << endl;
 
 			message.reply(status_codes::OK, response);
@@ -99,7 +107,7 @@ void restServer::handle_get(http_request message)
 //
 // A POST request
 //
-void restServer::handle_post(http_request message)
+void linuxRestServer::handle_post(http_request message)
 {
 	auto path = requestPath(message);
 
@@ -126,7 +134,7 @@ void restServer::handle_post(http_request message)
 //
 // A DELETE request
 //
-void restServer::handle_delete(http_request message)
+void linuxRestServer::handle_delete(http_request message)
 {
 	ucout << message.to_string() << endl;
 
@@ -139,7 +147,7 @@ void restServer::handle_delete(http_request message)
 //
 // A PUT request 
 //
-void restServer::handle_put(http_request message)
+void linuxRestServer::handle_put(http_request message)
 {
 	ucout << message.to_string() << endl;
 	string rep = "WRITE YOUR OWN PUT OPERATION";
